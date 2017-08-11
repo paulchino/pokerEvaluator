@@ -1,12 +1,24 @@
-
-var testStrings = {
+// TODO: MOVE TO TESTS
+var sampleHands = {
     'broadway': 'as kd qh js th',
     'wheel': '2d ac 3s 5d 4s',
     'straight': '8d ts jc 9h qc',
     'flush': '3s 5s as 8s qs',
     'strightFlush': '3d 5d 2d 4d 6d',
-    'royalFlush': 'ah kh qh jh th'
-}
+    'royalFlush': 'ah kh qh jh th',
+    'highHand': 'js 8c 4d 3s 2c'
+};
+
+var validations = {
+    type: {a: 'foo'},
+    type1: 12,
+    type2: [[1], 'foo'],
+    length: 'ah 5d 3d 9c as 6h',
+    length1: ['6s', '9c', '3s', 'th', 'as', 'qh'],
+    cardValue: 'abc d 12',
+    cardValue1: 'ah 5d 3d 9c ar',
+    cardValue2: 'bh 5d 3d 9c ar'
+};
 
 
 var pineappleEvaluator = {
@@ -47,6 +59,13 @@ var pineappleEvaluator = {
         'straightFlush': 9,
         'royalFlush': 10
     },
+
+    ERROR_MSGS: {
+        'length': 'Input must be 3 or 5 cards seperated by space',
+        'value': 'Incorrect card value. Sample "as td js 2c 7h"',
+        'comparsionLength': 'Cards being compared must be same length',
+        'inputType': 'Input is either an array or a space seperated string'
+    },
     // reset everytime hand is eval'ed
     cardHistogram: {
         'a': 0,
@@ -70,20 +89,20 @@ var pineappleEvaluator = {
         }
     },
 
-    _createCardList: function(cards) {
+    _validateCardList: function(cards) {
         var cardList;
 
         if (typeof cards === 'string') {
             cardList = cards.toLowerCase().split(' ');
-        }
-        if (Array.isArray(cards)) {
+        } else if (Array.isArray(cards)) {
             cardList = cards;
+        } else {
+            console.log(this.ERROR_MSGS.inputType);
+            return false;
         }
 
-        // TODO: Error handling
-        return cardList;
+        return this._validateInput(cardList) ? cardList : false;
     },
-
 
     _orderCards: function(cardList) {
         var orderedCardValues = [],
@@ -100,7 +119,7 @@ var pineappleEvaluator = {
 
     // hand checks accepts string OR array.
     isStraight: function(cards, skipFlushCheck) {
-        var cardList = this._createCardList(cards),
+        var cardList = this._validateCardList(cards),
         orderedCardValues = this._orderCards(cardList),
         straight = false,
         lowCard = orderedCardValues[0],
@@ -120,7 +139,7 @@ var pineappleEvaluator = {
     },
 
     isBroadwayStraight: function(cards, skipFlushCheck) {
-        var cardList = this._createCardList(cards),
+        var cardList = this._validateCardList(cards),
         orderedCardValues,
         lowCard,
         highCard,
@@ -146,7 +165,7 @@ var pineappleEvaluator = {
     },
 
     isFlush: function(cards, skipStraightCheck) {
-        var cardList = this._createCardList(cards),
+        var cardList = this._validateCardList(cards),
         isFlush = !!cardList.reduce(function(a, b) {
             return (a[1] === b[1]) ? a: NaN;
         });
@@ -159,13 +178,13 @@ var pineappleEvaluator = {
     },
 
     isStraightFlush: function(cards) {
-        var cardList = this._createCardList(cards);
+        var cardList = this._validateCardList(cards);
 
         return this.isStraight(cardList, true) && this.isFlush(cardList, true);
     },
 
     analyzeHand: function(cards) {
-        var cardList = this._createCardList(cards),
+        var cardList = this._validateCardList(cards),
         hasOnePair = false,
         hasTwoPair = false,
         hasSet = false,
@@ -201,7 +220,7 @@ var pineappleEvaluator = {
             } else if (isStraight) {
                 handStruct = this.straightStruct(cardList);
             } else {
-                // high hand
+                handStruct = this.highHandStruct(cardList);
             }
         } else {
             for (count in this.cardHistogram) {
@@ -424,11 +443,49 @@ var pineappleEvaluator = {
         }
     },
 
-    highHandStruct: function() {
+    highHandStruct: function(cardList) {
+        var highValue,
+        cardValue = this._orderCards(cardList);
 
+        highValue = cardValue.pop();
+        this.reverseSort(cardValue);
+
+        return {
+            name: 'highHand',
+            rankStrength: 1,
+            highValue: highValue,
+            kickers: cardValue
+        }
     },
 
+    /*
+    VALIDATIONS
+    */
+    _validateInput: function(cardList) {
+        var validInput = true,
+        self = this;
 
+        if (!(cardList.length == 3 || cardList.length == 5)) {
+            console.log(this.ERROR_MSGS.length);
+            return false;
+        }
+
+        cardList.forEach(function(card) {
+            if (typeof cards !== 'string' ||
+                card.length !== 2 ||
+                !(card[0] in self.cardHistogram) ||
+                !(card[1] in self.SUIT_NAMES)) {
+                validInput = false;
+                console.log(self.ERROR_MSGS.value);
+            }
+        });
+
+        return validInput;
+    },
+
+    /*
+    HELPER FUNCTIONS
+    */
 
     reverseSort: function(arr) {
         arr.sort(function(a,b) {
